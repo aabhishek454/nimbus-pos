@@ -1,6 +1,7 @@
 const express = require('express');
 const cors = require('cors');
 const path = require('path');
+const connectDB = require('./config/db');
 
 const authRoutes = require('./routes/authRoutes');
 const orderRoutes = require('./routes/orderRoutes');
@@ -19,8 +20,27 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 
+// Ensure DB is connected before handling ANY request (critical for serverless)
+app.use(async (req, res, next) => {
+    try {
+        await connectDB();
+        next();
+    } catch (error) {
+        console.error('DB connection middleware failed:', error.message);
+        res.status(503).json({
+            success: false,
+            error: 'Database connection failed. Please try again shortly.'
+        });
+    }
+});
+
 // Serve static receipts
 app.use('/receipts', express.static(path.join(__dirname, 'receipts')));
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+    res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
+});
 
 // Routes
 app.use('/api/auth', authRoutes);

@@ -3,8 +3,10 @@ const http = require('http');
 const app = require('./app');
 const connectDB = require('./config/db');
 
-// Connect to Database
-connectDB();
+// Pre-connect to database at module load (for both local & serverless)
+connectDB().catch((err) => {
+    console.error('Initial DB connection failed:', err.message);
+});
 
 const PORT = process.env.PORT || 5000;
 
