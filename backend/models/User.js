@@ -17,8 +17,13 @@ const userSchema = new mongoose.Schema({
     },
     role: {
         type: String,
-        enum: ['employee', 'owner', 'admin'],
+        enum: ['employee', 'manager', 'owner', 'admin'],
         default: 'owner'
+    },
+    status: {
+        type: String,
+        enum: ['pending', 'approved', 'rejected', 'deactivated'],
+        default: 'approved'
     },
     businessId: {
         type: mongoose.Schema.Types.ObjectId,

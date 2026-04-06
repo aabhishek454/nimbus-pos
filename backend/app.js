@@ -7,6 +7,11 @@ const orderRoutes = require('./routes/orderRoutes');
 const expenseRoutes = require('./routes/expenseRoutes');
 const receiptRoutes = require('./routes/receiptRoutes');
 const adminRoutes = require('./routes/adminRoutes');
+const analyticsRoutes = require('./routes/analyticsRoutes');
+const inventoryRoutes = require('./routes/inventoryRoutes');
+const attendanceRoutes = require('./routes/attendanceRoutes');
+const exportRoutes = require('./routes/exportRoutes');
+const reportRoutes = require('./routes/reportRoutes');
 
 const app = express();
 
@@ -23,6 +28,11 @@ app.use('/api/orders', orderRoutes);
 app.use('/api/expenses', expenseRoutes);
 app.use('/api/receipts', receiptRoutes);
 app.use('/api/admin', adminRoutes);
+app.use('/api/analytics', analyticsRoutes);
+app.use('/api/inventory', inventoryRoutes);
+app.use('/api/attendance', attendanceRoutes);
+app.use('/api/export', exportRoutes);
+app.use('/api/reports', reportRoutes);
 
 // Centralized error handler
 app.use((err, req, res, next) => {

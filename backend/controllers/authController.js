@@ -26,7 +26,8 @@ const register = async (req, res, next) => {
             name,
             email,
             password: hashedPassword,
-            role: 'owner'
+            role: 'owner',
+            status: 'pending'
         });
         await user.save();
 
@@ -64,6 +65,10 @@ const login = async (req, res, next) => {
         const isMatch = await bcrypt.compare(password, user.password);
         if (!isMatch) {
             return res.status(401).json({ success: false, error: 'Invalid credentials' });
+        }
+
+        if (user.role === 'owner' && user.status !== 'approved') {
+            return res.status(403).json({ success: false, error: 'Account pending admin approval by administrator.' });
         }
 
         res.status(200).json({
@@ -121,4 +126,23 @@ const getEmployees = async (req, res, next) => {
     }
 };
 
-module.exports = { register, login, addEmployee, getEmployees };
+const deleteEmployee = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || user.role !== 'employee') {
+            return res.status(404).json({ success: false, error: 'Employee not found' });
+        }
+        
+        // Ensure the owner deleting the employee actually owns the business the employee is assigned to
+        if (user.businessId.toString() !== req.user.businessId.toString() && req.user.role !== 'admin') {
+            return res.status(403).json({ success: false, error: 'Not authorized to delete this employee' });
+        }
+
+        await User.findByIdAndDelete(req.params.id);
+        res.status(200).json({ success: true, data: {} });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { register, login, addEmployee, getEmployees, deleteEmployee };

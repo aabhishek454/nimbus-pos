@@ -19,6 +19,14 @@ const businessSchema = new mongoose.Schema({
         type: String,
         enum: ['trial', 'pro', 'free'],
         default: 'free'
+    },
+    gstNumber: {
+        type: String,
+        default: ''
+    },
+    invoiceCounter: {
+        type: Number,
+        default: 0
     }
 }, { timestamps: true });
 

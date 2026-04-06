@@ -1,18 +1,28 @@
 const Order = require('../models/Order');
+const { deductInventory } = require('./inventoryController');
 
 // @desc Create new order
 // @route POST /api/orders
 const createOrder = async (req, res, next) => {
-    const { amount, paymentType, status } = req.body;
+    const { customerName, items, totalAmount, paymentType, status } = req.body;
 
     try {
         const order = await Order.create({
-            amount,
+            customerName,
+            items,
+            totalAmount,
             paymentType,
             status: status || 'paid',
             employeeId: req.user._id,
             businessId: req.businessId
         });
+
+        // Auto-deduct inventory for matching items
+        try {
+            await deductInventory(items, req.businessId);
+        } catch (invErr) {
+            console.log('Inventory deduction skipped:', invErr.message);
+        }
 
         res.status(201).json({ success: true, data: order });
     } catch (error) {
@@ -41,6 +51,39 @@ const getTodayOrders = async (req, res, next) => {
     }
 };
 
+// @desc Get all orders (history)
+// @route GET /api/orders
+const getAllOrders = async (req, res, next) => {
+    try {
+        const filter = { businessId: req.businessId };
+        
+        let dateRange = {};
+        const now = new Date();
+        if (req.query.dateFilter === 'today') {
+            const startOfToday = new Date(now.setHours(0, 0, 0, 0));
+            dateRange = { $gte: startOfToday };
+        } else if (req.query.dateFilter === '7days') {
+            const last7Days = new Date(now.setDate(now.getDate() - 7));
+            dateRange = { $gte: last7Days };
+        } else if (req.query.dateFilter === 'monthly') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateRange = { $gte: startOfMonth };
+        }
+        
+        if (Object.keys(dateRange).length > 0) {
+            filter.createdAt = dateRange;
+        }
+
+        const orders = await Order.find(filter)
+            .populate('employeeId', 'name')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({ success: true, count: orders.length, data: orders });
+    } catch (error) {
+        next(error);
+    }
+};
+
 // @desc Get orders summary
 // @route GET /api/orders/summary
 const getOrderSummary = async (req, res, next) => {
@@ -52,9 +95,9 @@ const getOrderSummary = async (req, res, next) => {
         let totalOnline = 0;
 
         orders.forEach(order => {
-            totalSales += order.amount;
-            if (order.paymentType === 'cash') totalCash += order.amount;
-            if (order.paymentType === 'online') totalOnline += order.amount;
+            totalSales += order.totalAmount;
+            if (order.paymentType === 'cash') totalCash += order.totalAmount;
+            if (order.paymentType === 'online') totalOnline += order.totalAmount;
         });
 
         res.status(200).json({
@@ -76,7 +119,7 @@ const getEmployeeActivity = async (req, res, next) => {
                 $group: {
                     _id: '$employeeId',
                     totalOrders: { $sum: 1 },
-                    totalSales: { $sum: '$amount' }
+                    totalSales: { $sum: '$totalAmount' }
                 }
             },
             {
@@ -105,4 +148,44 @@ const getEmployeeActivity = async (req, res, next) => {
     }
 };
 
-module.exports = { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity };
+// @desc Get Date-wise analytics
+// @route GET /api/orders/analytics
+const getDateWiseAnalytics = async (req, res, next) => {
+    try {
+        const { filter } = req.query; // 'today', '7days', 'monthly'
+        
+        let start = new Date();
+        if (filter === 'today') {
+            start.setHours(0, 0, 0, 0);
+        } else if (filter === '7days') {
+            start.setDate(start.getDate() - 7);
+        } else if (filter === 'monthly') {
+            start.setMonth(start.getMonth() - 1);
+        } else {
+            start.setHours(0, 0, 0, 0); // default to today
+        }
+
+        const stats = await Order.aggregate([
+            {
+                $match: {
+                    businessId: req.businessId,
+                    createdAt: { $gte: start }
+                }
+            },
+            {
+                $group: {
+                    _id: { $dateToString: { format: "%Y-%m-%d", date: "$createdAt" } },
+                    totalSales: { $sum: '$totalAmount' },
+                    totalOrders: { $sum: 1 }
+                }
+            },
+            { $sort: { _id: 1 } }
+        ]);
+
+        res.status(200).json({ success: true, data: stats });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics };

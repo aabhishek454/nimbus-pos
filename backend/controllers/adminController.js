@@ -2,17 +2,14 @@ const Business = require('../models/Business');
 const User = require('../models/User');
 const Order = require('../models/Order');
 
-// @desc Get platform-wide statistics for admins
-// @route GET /api/admin/stats
 const getSystemStats = async (req, res, next) => {
     try {
         const totalBusinesses = await Business.countDocuments();
         const totalUsers = await User.countDocuments();
         const totalOrders = await Order.countDocuments();
         
-        // Let's assume some dummy platform revenue based on Pro accounts active (just for show)
-        const proBusinesses = await Business.countDocuments({ plan: 'pro' });
-        const monthlyRevenue = proBusinesses * 49; // Let's say $49/mo
+        const proBusinesses = await Business.countDocuments();
+        const monthlyRevenue = proBusinesses * 49; 
         
         res.status(200).json({
             success: true,
@@ -28,8 +25,6 @@ const getSystemStats = async (req, res, next) => {
     }
 };
 
-// @desc Get list of all businesses
-// @route GET /api/admin/businesses
 const getBusinessesList = async (req, res, next) => {
     try {
         const businesses = await Business.find().populate('ownerId', 'name email').sort({ createdAt: -1 });
@@ -42,6 +37,129 @@ const getBusinessesList = async (req, res, next) => {
     }
 };
 
+const getPendingOwners = async (req, res, next) => {
+    try {
+        const pendingOwners = await User.find({ role: 'owner', status: 'pending' }).select('-password').populate('businessId', 'name');
+        res.status(200).json({ success: true, data: pendingOwners });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const approveOwner = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || user.role !== 'owner') {
+            return res.status(404).json({ success: false, error: 'Owner not found' });
+        }
+        user.status = 'approved';
+        await user.save();
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// NEW: Reject (Delete) Pending Owner
+const rejectOwner = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || user.status !== 'pending') {
+            return res.status(404).json({ success: false, error: 'Pending owner not found' });
+        }
+        // If owner created a business object before approval, delete it too
+        if (user.businessId) {
+            await Business.findByIdAndDelete(user.businessId);
+        }
+        await User.findByIdAndDelete(req.params.id);
+        res.status(200).json({ success: true, data: {} });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// NEW: Deactivate Approved Owner
+const deactivateOwner = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || user.role !== 'owner') {
+            return res.status(404).json({ success: false, error: 'Owner not found' });
+        }
+        user.status = 'deactivated';
+        await user.save();
+        res.status(200).json({ success: true, data: user });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// NEW: Delete Approved Owner (Cascading)
+const deleteOwner = async (req, res, next) => {
+    try {
+        const user = await User.findById(req.params.id);
+        if (!user || user.role !== 'owner') {
+            return res.status(404).json({ success: false, error: 'Owner not found' });
+        }
+        
+        const businessId = user.businessId;
+
+        // Cascade Delete
+        if (businessId) {
+            await Order.deleteMany({ businessId }); // Orders
+            await User.deleteMany({ businessId, role: 'employee' }); // Employees
+            await Business.findByIdAndDelete(businessId); // The Business itself
+        }
+        await User.findByIdAndDelete(user._id); // Delete the owner account
+
+        res.status(200).json({ success: true, data: {} });
+    } catch (error) {
+        next(error);
+    }
+};
+
+const getAllUsers = async (req, res, next) => {
+    try {
+        const users = await User.find({ role: { $ne: 'admin' } }).select('-password').populate('businessId', 'name');
+        res.status(200).json({ success: true, data: users });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// NEW: All Platform Orders
+const getAllOrders = async (req, res, next) => {
+    try {
+        const filter = {};
+        if (req.query.businessId) filter.businessId = req.query.businessId;
+
+        let dateRange = {};
+        const now = new Date();
+        if (req.query.dateFilter === 'today') {
+            const startOfToday = new Date(now.setHours(0, 0, 0, 0));
+            dateRange = { $gte: startOfToday };
+        } else if (req.query.dateFilter === '7days') {
+            const last7Days = new Date(now.setDate(now.getDate() - 7));
+            dateRange = { $gte: last7Days };
+        } else if (req.query.dateFilter === 'monthly') {
+            const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+            dateRange = { $gte: startOfMonth };
+        }
+        
+        if (Object.keys(dateRange).length > 0) {
+            filter.createdAt = dateRange;
+        }
+
+        const orders = await Order.find(filter)
+            .populate('businessId', 'name')
+            .populate('employeeId', 'name')
+            .sort({ createdAt: -1 });
+
+        res.status(200).json({ success: true, data: orders });
+    } catch (error) {
+        next(error);
+    }
+};
+
 const getActivityTracking = async (req, res, next) => {
     try {
         const businessStats = await Order.aggregate([
@@ -49,7 +167,7 @@ const getActivityTracking = async (req, res, next) => {
                 $group: {
                     _id: '$businessId',
                     totalOrders: { $sum: 1 },
-                    totalRevenue: { $sum: '$amount' }
+                    totalRevenue: { $sum: '$totalAmount' }
                 }
             },
             {
@@ -63,6 +181,7 @@ const getActivityTracking = async (req, res, next) => {
             { $unwind: '$business' },
             {
                 $project: {
+                    businessId: '$_id',
                     businessName: '$business.name',
                     totalOrders: 1,
                     totalRevenue: 1
@@ -75,7 +194,7 @@ const getActivityTracking = async (req, res, next) => {
                 $group: {
                     _id: { employeeId: '$employeeId', businessId: '$businessId' },
                     orderCount: { $sum: 1 },
-                    revenueGenerated: { $sum: '$amount' }
+                    revenueGenerated: { $sum: '$totalAmount' }
                 }
             },
             {
@@ -123,4 +242,15 @@ const getActivityTracking = async (req, res, next) => {
     }
 };
 
-module.exports = { getSystemStats, getBusinessesList, getActivityTracking };
+module.exports = { 
+    getSystemStats, 
+    getBusinessesList, 
+    getActivityTracking, 
+    getPendingOwners, 
+    approveOwner, 
+    rejectOwner, 
+    deleteOwner, 
+    deactivateOwner,
+    getAllUsers,
+    getAllOrders
+};
