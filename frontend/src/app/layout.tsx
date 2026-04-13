@@ -22,12 +22,15 @@ export const metadata: Metadata = {
 };
 
 export const viewport = {
-  themeColor: "#121212",
+  themeColor: "#050507",
   width: "device-width",
   initialScale: 1,
-  maximumScale: 1, // Disable pinch-zoom so it feels native
+  maximumScale: 1,
   userScalable: false,
+  viewportFit: "cover",
 };
+
+import BackgroundBlobs from "@/components/BackgroundBlobs";
 
 export default function RootLayout({
   children,
@@ -36,7 +39,8 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" suppressHydrationWarning className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full font-[family-name:var(--font-inter)]">
+      <body className="min-h-full font-[family-name:var(--font-inter)] bg-[var(--bg-primary)] overflow-x-hidden relative">
+        <BackgroundBlobs />
         <ThemeProvider>{children}</ThemeProvider>
       </body>
     </html>

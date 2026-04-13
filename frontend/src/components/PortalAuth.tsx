@@ -52,12 +52,22 @@ export default function PortalAuth({
     setLoading(true);
 
     try {
-      const response = await api.post<AuthResponse>(
+      const response = await api.post(
         isLogin ? "/auth/login" : "/auth/register",
         isLogin ? { email, password } : { name, email, password, businessName }
       );
 
-      const { token, user } = response.data;
+      const { token, user, message } = response.data as any;
+
+      if (!token) {
+        // Owner registered but pending
+        toast.success(message || "Account created successfully. Pending Admin approval!");
+        setIsLogin(true);
+        setName("");
+        setBusinessName("");
+        setPassword("");
+        return;
+      }
 
       if (user.role !== role) {
         toast.error("Please use the correct portal for this account.");
