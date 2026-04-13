@@ -174,7 +174,7 @@ const getInvoice = async (req, res, next) => {
     }
 };
 
-// @desc Generate KOT (Kitchen Order Ticket) PDF
+// @desc Generate KOT (Order Slip) PDF
 // @route GET /api/reports/slip/:orderId
 const getKOT = async (req, res, next) => {
     try {
@@ -183,9 +183,8 @@ const getKOT = async (req, res, next) => {
 
         const business = await Business.findById(order.businessId);
 
-        const doc = new PDFDocument({ margin: 30, size: [250, 600] }); // Receipt printer style
+        const doc = new PDFDocument({ margin: 20, size: [280, 600] }); // Receipt printer style
         
-        const date = new Date().toISOString().split("T")[0];
         const fileName = `kot-${order.orderNumber || order._id.toString().slice(-6)}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
         res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
@@ -193,33 +192,55 @@ const getKOT = async (req, res, next) => {
         doc.pipe(res);
 
         // KOT Header
-        doc.fontSize(14).fillColor('#000').text('KITCHEN ORDER TICKET', { align: 'center', bold: true });
-        doc.moveDown(0.5);
-        doc.fontSize(10);
-        doc.text(`Order No: ${order.orderNumber || order._id.toString().slice(-6)}`);
-        doc.text(`Time: ${new Date(order.createdAt).toLocaleString('en-IN')}`);
-        doc.text(`Type: ${order.orderType ? order.orderType.toUpperCase() : 'DINE-IN'}`);
-        if (order.tableNumber) doc.text(`Table: ${order.tableNumber}`);
-        doc.text(`Server: ${order.employeeId?.name || 'Staff'}`);
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#000').text('ORDER SLIP', { align: 'center' });
         doc.moveDown(0.5);
         
-        // Dashed line equivalent
-        doc.text('-----------------------------------', { align: 'center' });
+        doc.fontSize(10).font('Helvetica');
+        doc.text(`Order Number: ${order.orderNumber || order._id.toString().slice(-6)}`);
+        doc.text(`Date & Time: ${new Date(order.createdAt).toLocaleString('en-IN')}`);
+        doc.text(`Customer Name: ${order.customerName || 'Walk-in'}`);
+        if (order.tableNumber) doc.text(`Table: ${order.tableNumber}`);
+        doc.text(`Order Type: ${order.orderType ? order.orderType.toUpperCase() : 'DINE-IN'}`);
+        
         doc.moveDown(0.5);
+        doc.text('----------------------------------------------------', { align: 'center' });
+        doc.moveDown(0.2);
 
-        // KOT Items
-        doc.fontSize(10).text('Qty  Item Name', 30, doc.y);
-        doc.text('-----------------------------------', { align: 'center' });
+        // Table Layout Header
+        const tableTop = doc.y;
+        doc.font('Helvetica-Bold');
+        doc.text('Dish Name', 20, tableTop, { width: 110 });
+        doc.text('Variant', 140, tableTop, { width: 60 });
+        doc.text('Amount', 210, tableTop, { width: 50, align: 'right' });
+        
+        doc.moveDown(0.2);
+        let y = doc.y;
+        doc.font('Helvetica').text('----------------------------------------------------', 20, y, { align: 'center' });
+        y += 12;
 
+        // Loop Items
         (order.items || []).forEach((item) => {
-            const varTxt = item.variant && item.variant !== 'full' ? ` (${item.variant})` : '';
-            doc.text(`${item.quantity.toString().padEnd(4, ' ')} ${item.name}${varTxt}`);
-            doc.moveDown(0.2);
+            const varTxt = item.variant ? item.variant.charAt(0).toUpperCase() + item.variant.slice(1) : 'Full';
+            const dishName = `${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}`;
+            
+            doc.text(dishName, 20, y, { width: 110 });
+            doc.text(varTxt, 140, y, { width: 60 });
+            doc.text(`Rs.${item.price * item.quantity}`, 210, y, { width: 50, align: 'right' });
+            y += 15;
+            doc.y = y;
         });
 
-        doc.moveDown(1);
-        doc.text('-----------------------------------', { align: 'center' });
-        doc.text('*** END OF KOT ***', { align: 'center' });
+        doc.moveDown(0.2);
+        doc.text('----------------------------------------------------', { align: 'center' });
+        doc.moveDown(0.5);
+
+        // Payment Status
+        doc.fontSize(12).font('Helvetica-Bold');
+        if (order.paymentStatus === 'paid') {
+           doc.text(`Payment Status: PAID`, { align: 'center' });
+        } else {
+           doc.text(`Payment Status: PENDING`, { align: 'center' });
+        }
 
         doc.end();
     } catch (error) {
