@@ -16,6 +16,7 @@ import ThemeToggle from '@/components/ThemeToggle';
 
 export default function AdminDashboard() {
     const router = useRouter();
+    const [isClient, setIsClient] = useState(false);
     const [stats, setStats] = useState<any>({ totalBusinesses: 0, totalUsers: 0, totalOrders: 0, monthlyRevenue: 0 });
     const [businesses, setBusinesses] = useState<any[]>([]);
     const [pendingOwners, setPendingOwners] = useState<any[]>([]);
@@ -78,6 +79,7 @@ export default function AdminDashboard() {
     };
 
     useEffect(() => {
+        setIsClient(true);
         fetchData();
         let interval: NodeJS.Timeout;
         const poll = () => {
@@ -138,6 +140,8 @@ export default function AdminDashboard() {
             </div>
         </GlassCard>
     );
+
+    if (!isClient) return null;
 
     return (
         <AnimatedPage>
@@ -256,12 +260,12 @@ export default function AdminDashboard() {
                                             <tr><td colSpan={3} className="p-12 text-center text-[var(--text-muted)] font-medium">No telemetry data.</td></tr>
                                         ) : (
                                             businessPerformance.map((bp) => (
-                                                <tr key={bp._id} className="hover:bg-[var(--glass-bg-strong)] transition-colors duration-200">
+                                                <tr key={bp.businessId || Math.random()} className="hover:bg-[var(--glass-bg-strong)] transition-colors duration-200">
                                                     <td className="p-5 font-bold text-[var(--text-primary)]">{bp.businessName}</td>
                                                     <td className="p-5 text-center text-[var(--text-secondary)] font-medium">
                                                         <span className="glass-panel px-3 py-1 rounded-full text-xs">{bp.totalOrders}</span>
                                                     </td>
-                                                    <td className="p-5 text-right text-emerald-500 font-bold tracking-wide">{formatINR(bp.totalRevenue)}</td>
+                                                    <td className="p-5 text-right text-emerald-500 font-bold tracking-wide">{formatINR(bp.totalRevenue || 0)}</td>
                                                 </tr>
                                             ))
                                         )}
@@ -301,17 +305,17 @@ export default function AdminDashboard() {
                                         <tr><td colSpan={5} className="p-12 text-center text-[var(--text-muted)] font-medium">No global orders present in timeframe.</td></tr>
                                     ) : (
                                         allOrders.map(o => (
-                                            <tr key={o._id} className="hover:bg-[var(--glass-bg-strong)] text-sm transition-colors duration-200">
-                                                <td className="p-5 text-[var(--text-muted)] font-mono text-[10px] tracking-widest">{o._id.slice(-6)}</td>
+                                            <tr key={o._id || Math.random()} className="hover:bg-[var(--glass-bg-strong)] text-sm transition-colors duration-200">
+                                                <td className="p-5 text-[var(--text-muted)] font-mono text-[10px] tracking-widest">{o._id ? o._id.slice(-6) : 'N/A'}</td>
                                                 <td className="p-5 font-bold text-[var(--text-primary)]">{o.businessId?.name || 'Unknown'}</td>
                                                 <td className="p-5 text-[var(--text-secondary)] max-w-[200px] truncate font-medium">
                                                     {(o.items || []).map((i:any) => `${i.quantity}x ${i.name}`).join(', ')}
                                                 </td>
                                                 <td className="p-5">
-                                                    <p className="text-[var(--text-secondary)] text-xs font-medium">{format(new Date(o.createdAt), 'MMM d, h:mm a')}</p>
-                                                    <span className={`px-2.5 py-1 mt-1.5 inline-block text-[9px] uppercase font-bold tracking-widest rounded-md glass-panel border border-[var(--glass-border)] shadow-sm`}>{o.status}</span>
+                                                    <p className="text-[var(--text-secondary)] text-xs font-medium">{o.createdAt ? format(new Date(o.createdAt), 'MMM d, h:mm a') : 'N/A'}</p>
+                                                    <span className={`px-2.5 py-1 mt-1.5 inline-block text-[9px] uppercase font-bold tracking-widest rounded-md glass-panel border border-[var(--glass-border)] shadow-sm`}>{o.paymentStatus || 'PENDING'}</span>
                                                 </td>
-                                                <td className="p-5 text-right font-black text-emerald-500 tracking-wide text-lg">{formatINR(o.totalAmount)}</td>
+                                                <td className="p-5 text-right font-black text-emerald-500 tracking-wide text-lg">{formatINR(o.totalAmount || 0)}</td>
                                             </tr>
                                         ))
                                     )}
