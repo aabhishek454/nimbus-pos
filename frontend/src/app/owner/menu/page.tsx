@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/axios';
-import { UtensilsCrossed, Plus, Trash2, Edit2, Loader2, Save, X, Search } from 'lucide-react';
+import { UtensilsCrossed, Plus, Trash2, Edit2, Loader2, Save, X, Search, Upload, FileText } from 'lucide-react';
 import { Toaster, toast } from 'react-hot-toast';
 import AnimatedPage from '@/components/AnimatedPage';
 import GlassCard from '@/components/GlassCard';
@@ -20,6 +20,7 @@ export default function MenuManager() {
     const [category, setCategory] = useState('General');
     const [variants, setVariants] = useState<{ type: string; price: number }[]>([{ type: 'full', price: 0 }]);
     const [formLoading, setFormLoading] = useState(false);
+    const [uploadLoading, setUploadLoading] = useState(false);
 
     useEffect(() => {
         fetchMenu();
@@ -98,6 +99,50 @@ export default function MenuManager() {
         setVariants(newVariants);
     };
 
+    const handleCSVUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+        const file = e.target.files?.[0];
+        if (!file) return;
+
+        if (file.type !== 'text/csv' && !file.name.endsWith('.csv')) {
+            return toast.error('Please upload a valid CSV file');
+        }
+
+        const formData = new FormData();
+        formData.append('file', file);
+
+        setUploadLoading(true);
+        try {
+            const res = await api.post('/menu/upload-csv', formData, {
+                headers: { 'Content-Type': 'multipart/form-data' }
+            });
+            toast.success(res.data.message || 'Menu uploaded successfully');
+            fetchMenu();
+            // Reset input
+            e.target.value = '';
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Failed to upload CSV');
+        } finally {
+            setUploadLoading(false);
+        }
+    };
+
+    const downloadSampleCSV = () => {
+        const headers = 'Name,Category,Variant,Price\n';
+        const sample1 = 'Chicken Momo,Snacks,Half,60\n';
+        const sample2 = 'Chicken Momo,Snacks,Full,120\n';
+        const sample3 = 'Veg Chowmein,Main Course,Full,100\n';
+        
+        const blob = new Blob([headers + sample1 + sample2 + sample3], { type: 'text/csv' });
+        const url = window.URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.setAttribute('hidden', '');
+        a.setAttribute('href', url);
+        a.setAttribute('download', 'menu_template.csv');
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+    };
+
     const filteredMenu = menu.filter(item => item.name.toLowerCase().includes(search.toLowerCase()) || 
                                               (item.category && item.category.toLowerCase().includes(search.toLowerCase())));
 
@@ -113,6 +158,27 @@ export default function MenuManager() {
                             <UtensilsCrossed className="w-8 h-8 text-[var(--primary)]" /> Menu Management
                         </h1>
                         <p className="text-[var(--text-secondary)] mt-1 tracking-wide">Configure dishes, variants, and dynamic pricing natively.</p>
+                    </div>
+                    
+                    <div className="flex flex-wrap gap-3">
+                        <GlassButton variant="secondary" onClick={downloadSampleCSV} className="flex items-center gap-2 !py-2 !px-4 text-xs font-bold">
+                            <FileText className="w-4 h-4" /> Template
+                        </GlassButton>
+                        <div className="relative">
+                            <input 
+                                type="file" 
+                                id="csvUpload" 
+                                accept=".csv" 
+                                onChange={handleCSVUpload} 
+                                className="hidden" 
+                            />
+                            <label htmlFor="csvUpload">
+                                <GlassButton as="div" variant="primary" className="flex items-center gap-2 !py-2 !px-4 text-xs font-bold cursor-pointer !bg-[var(--primary)] text-white border-transparent">
+                                    {uploadLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Upload className="w-4 h-4" />}
+                                    Bulk Import
+                                </GlassButton>
+                            </label>
+                        </div>
                     </div>
                 </header>
 
