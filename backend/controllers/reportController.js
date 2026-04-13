@@ -235,12 +235,12 @@ const getKOT = async (req, res, next) => {
         doc.moveDown(0.5);
 
         // Payment Status
-        doc.fontSize(12).font('Helvetica-Bold');
-        if (order.paymentStatus === 'paid') {
-           doc.text(`Payment Status: PAID`, { align: 'center' });
-        } else {
-           doc.text(`Payment Status: PENDING`, { align: 'center' });
-        }
+        doc.moveDown();
+        const statusText = order.paymentStatus === 'paid' ? 'PAID' : 'PENDING';
+        
+        doc.fontSize(10).font('Helvetica').text('----------------------------------------------------');
+        doc.fontSize(12).font('Helvetica-Bold').text(`Payment Status: ${statusText}`, { align: "left" });
+        doc.fontSize(10).font('Helvetica').text('----------------------------------------------------');
 
         doc.end();
     } catch (error) {
