@@ -13,6 +13,20 @@ const inter = Inter({
 export const metadata: Metadata = {
   title: "Nimbus POS",
   description: "Premium SaaS dashboard for orders, analytics, and team operations.",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "black-translucent",
+    title: "Nimbus POS",
+  },
+};
+
+export const viewport = {
+  themeColor: "#121212",
+  width: "device-width",
+  initialScale: 1,
+  maximumScale: 1, // Disable pinch-zoom so it feels native
+  userScalable: false,
 };
 
 export default function RootLayout({
