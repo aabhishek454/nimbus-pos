@@ -53,6 +53,10 @@ const orderSchema = new mongoose.Schema({
         ref: 'Business',
         required: true,
         index: true
+    },
+    shareToken: {
+        type: String,
+        required: false
     }
 }, { timestamps: true });
 

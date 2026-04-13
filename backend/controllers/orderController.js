@@ -1,17 +1,20 @@
 const Order = require('../models/Order');
 const { deductInventory } = require('./inventoryController');
+const { sendWhatsAppMessage } = require('../utils/whatsappService');
+const crypto = require('crypto');
 
 // @desc Create new order
 // @route POST /api/orders
 const createOrder = async (req, res, next) => {
     const { customerName, customerPhone, tableNumber, orderType, items, totalAmount, paymentType, paymentStatus } = req.body;
 
-    // Generate unique short order number like 'KOT-8A4F'
     const orderNumber = 'KOT-' + Math.random().toString(36).substring(2, 6).toUpperCase();
+    const shareToken = crypto.randomBytes(32).toString('hex');
 
     try {
         const order = await Order.create({
             orderNumber,
+            shareToken,
             customerName: customerName || 'Walk-in',
             customerPhone,
             tableNumber,
@@ -24,11 +27,20 @@ const createOrder = async (req, res, next) => {
             businessId: req.businessId
         });
 
-        // Auto-deduct inventory for matching items
         try {
             await deductInventory(items, req.businessId);
         } catch (invErr) {
             console.log('Inventory deduction skipped:', invErr.message);
+        }
+
+        // WhatsApp Hook
+        if (customerPhone) {
+            const baseUrl = req.protocol + '://' + req.get('host') + '/api';
+            const kotUrl = `${baseUrl}/reports/public/slip/${order._id}?token=${shareToken}`;
+            const msg = `Hi ${order.customerName},\nYour order (*${orderNumber}*) has been confirmed! We have attached your Order Slip below.`;
+            
+            // Fire and forget
+            sendWhatsAppMessage(customerPhone, msg, kotUrl);
         }
 
         res.status(201).json({ success: true, data: order });
@@ -209,6 +221,15 @@ const markPaid = async (req, res, next) => {
         order.paymentStatus = 'paid';
         await order.save();
         
+        // WhatsApp Hook
+        if (order.customerPhone && order.shareToken) {
+            const baseUrl = req.protocol + '://' + req.get('host') + '/api';
+            const invoiceUrl = `${baseUrl}/reports/public/invoice/${order._id}?token=${order.shareToken}`;
+            const msg = `Payment Successful! Thank you for dining with us.\nYour final Invoice for order *${order.orderNumber || order._id.toString().slice(-6)}* is attached below.`;
+            
+            sendWhatsAppMessage(order.customerPhone, msg, invoiceUrl);
+        }
+
         res.status(200).json({ success: true, data: order });
     } catch (error) {
         next(error);

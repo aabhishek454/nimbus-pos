@@ -248,4 +248,134 @@ const getKOT = async (req, res, next) => {
     }
 };
 
-module.exports = { getMonthlyReport, getInvoice, getKOT };
+// @desc Public KOT Route (Secured by shareToken)
+// @route GET /api/reports/public/slip/:orderId
+const getPublicKOT = async (req, res, next) => {
+    try {
+        const order = await Order.findById(req.params.orderId).populate('employeeId', 'name');
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+        if (!req.query.token || req.query.token !== order.shareToken) return res.status(403).json({ success: false, error: 'Unauthorized access' });
+
+        const doc = new PDFDocument({ margin: 20, size: [280, 600] });
+        const fileName = `kot-${order.orderNumber || order._id.toString().slice(-6)}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+        
+        doc.pipe(res);
+
+        doc.fontSize(14).font('Helvetica-Bold').fillColor('#000').text('ORDER SLIP', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(10).font('Helvetica');
+        doc.text(`Order Number: ${order.orderNumber || order._id.toString().slice(-6)}`);
+        doc.text(`Date & Time: ${new Date(order.createdAt).toLocaleString('en-IN')}`);
+        doc.text(`Customer Name: ${order.customerName || 'Walk-in'}`);
+        if (order.tableNumber) doc.text(`Table: ${order.tableNumber}`);
+        doc.text(`Order Type: ${order.orderType ? order.orderType.toUpperCase() : 'DINE-IN'}`);
+        doc.moveDown(0.5);
+        doc.text('----------------------------------------------------', { align: 'center' });
+        doc.moveDown(0.2);
+
+        const tableTop = doc.y;
+        doc.font('Helvetica-Bold');
+        doc.text('Dish Name', 20, tableTop, { width: 110 });
+        doc.text('Variant', 140, tableTop, { width: 60 });
+        doc.text('Amount', 210, tableTop, { width: 50, align: 'right' });
+        
+        doc.moveDown(0.2);
+        let y = doc.y;
+        doc.font('Helvetica').text('----------------------------------------------------', 20, y, { align: 'center' });
+        y += 12;
+
+        (order.items || []).forEach((item) => {
+            const varTxt = item.variant ? item.variant.charAt(0).toUpperCase() + item.variant.slice(1) : 'Full';
+            const dishName = `${item.quantity > 1 ? item.quantity + 'x ' : ''}${item.name}`;
+            doc.text(dishName, 20, y, { width: 110 });
+            doc.text(varTxt, 140, y, { width: 60 });
+            doc.text(`Rs.${item.price * item.quantity}`, 210, y, { width: 50, align: 'right' });
+            y += 15;
+            doc.y = y;
+        });
+
+        doc.moveDown();
+        const statusText = order.paymentStatus === 'paid' ? 'PAID' : 'PENDING';
+        doc.fontSize(10).font('Helvetica').text('----------------------------------------------------');
+        doc.fontSize(12).font('Helvetica-Bold').text(`Payment Status: ${statusText}`, { align: "left" });
+        doc.fontSize(10).font('Helvetica').text('----------------------------------------------------');
+
+        doc.end();
+    } catch (error) { next(error); }
+};
+
+// @desc Public Invoice Route (Secured by shareToken)
+// @route GET /api/reports/public/invoice/:orderId
+const getPublicInvoice = async (req, res, next) => {
+    try {
+        const order = await Order.findById(req.params.orderId).populate('employeeId', 'name');
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+        if (!req.query.token || req.query.token !== order.shareToken) return res.status(403).json({ success: false, error: 'Unauthorized access' });
+
+        const business = await Business.findById(order.businessId);
+        
+        // Use existing counter, don't increment to avoid multiple increments on download
+        const invoiceNum = `INV-${String(business.invoiceCounter || 0).padStart(5, '0')}`;
+
+        const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        const fileName = `invoice-${order.orderNumber || order._id.toString().slice(-6)}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+        doc.pipe(res);
+
+        doc.fontSize(22).fillColor('#1e40af').text(business?.name || 'Restaurant', { align: 'center' });
+        doc.moveDown(0.2);
+        if (business?.gstNumber) doc.fontSize(9).fillColor('#6b7280').text(`GSTIN: ${business.gstNumber}`, { align: 'center' });
+        doc.moveDown(0.5);
+        doc.fontSize(16).fillColor('#111827').text('TAX INVOICE', { align: 'center' });
+        doc.moveDown(0.5);
+        doc.moveTo(50, doc.y).lineTo(550, doc.y).strokeColor('#1e40af').lineWidth(2).stroke();
+        doc.moveDown(0.8);
+
+        doc.fontSize(10).fillColor('#374151');
+        doc.text(`Invoice No: ${invoiceNum}`, 50);
+        doc.text(`Order Ref: ${order.orderNumber || 'N/A'}`, 50);
+        doc.text(`Date: ${new Date(order.createdAt).toLocaleString('en-IN')}`, 50);
+        doc.text(`Customer: ${order.customerName || 'Walk-in'}`, 50);
+        if (order.customerPhone) doc.text(`Phone: ${order.customerPhone}`, 50);
+        doc.text(`Payment: ${order.paymentType.toUpperCase()}`, 50);
+        doc.text(`Served by: ${order.employeeId?.name || 'Staff'}`, 50);
+        doc.moveDown(1);
+
+        const tableTop = doc.y;
+        doc.fontSize(10).fillColor('#ffffff');
+        doc.rect(50, tableTop - 5, 500, 22).fill('#1e40af');
+        doc.text('Item', 60, tableTop, { width: 200 });
+        doc.text('Qty', 270, tableTop, { width: 60, align: 'center' });
+        doc.text('Price', 340, tableTop, { width: 80, align: 'right' });
+        doc.text('Amount', 440, tableTop, { width: 100, align: 'right' });
+
+        let y = tableTop + 25;
+        (order.items || []).forEach((item, i) => {
+            const bg = i % 2 === 0 ? '#f9fafb' : '#ffffff';
+            doc.rect(50, y - 5, 500, 22).fill(bg);
+            doc.fontSize(10).fillColor('#374151');
+            const varTxt = item.variant && item.variant !== 'full' ? ` (${item.variant})` : '';
+            doc.text(`${item.name}${varTxt}`, 60, y, { width: 200 });
+            doc.text(item.quantity.toString(), 270, y, { width: 60, align: 'center' });
+            doc.text(`₹${item.price}`, 340, y, { width: 80, align: 'right' });
+            doc.text(`₹${(item.quantity * item.price).toLocaleString('en-IN')}`, 440, y, { width: 100, align: 'right' });
+            y += 22;
+        });
+
+        doc.moveDown(0.5);
+        y += 10;
+        doc.moveTo(50, y).lineTo(550, y).strokeColor('#1e40af').lineWidth(1).stroke();
+        y += 10;
+        doc.fontSize(14).fillColor('#1e40af').text(`Total: ₹${order.totalAmount.toLocaleString('en-IN')}`, 340, y, { width: 200, align: 'right' });
+
+        doc.moveDown(4);
+        doc.fontSize(9).fillColor('#9ca3af').text('Thank you for your visit!', { align: 'center' });
+
+        doc.end();
+    } catch (error) { next(error); }
+};
+
+module.exports = { getMonthlyReport, getInvoice, getKOT, getPublicKOT, getPublicInvoice };

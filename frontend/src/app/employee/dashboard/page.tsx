@@ -373,8 +373,8 @@ export default function EmployeeDashboard() {
                             
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Phone</label>
-                                    <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors focus:border-emerald-500" placeholder="+91..." />
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Phone (WhatsApp Slip)</label>
+                                    <input type="text" value={customerPhone} onChange={(e) => setCustomerPhone(e.target.value)} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors focus:border-[var(--primary)] text-[var(--text-primary)]" placeholder="+91..." />
                                 </div>
                                 <div>
                                     <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Order Type</label>
@@ -461,7 +461,7 @@ export default function EmployeeDashboard() {
                             
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Phone</label>
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Phone (WhatsApp Slip)</label>
                                     <input type="text" value={editingOrder.customerPhone || ''} onChange={(e) => setEditingOrder({...editingOrder, customerPhone: e.target.value})} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors focus:border-blue-500" placeholder="+91..." />
                                 </div>
                                 <div>
