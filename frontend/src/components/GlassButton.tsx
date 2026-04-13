@@ -1,20 +1,16 @@
 "use client";
 
-import { ElementType, PropsWithChildren } from "react";
+import { PropsWithChildren } from "react";
 import { motion, HTMLMotionProps } from "framer-motion";
+
 import { cx } from "@/lib/utils";
-import { haptics } from "@/utils/haptics";
 
 type Variant = "primary" | "secondary" | "ghost";
 
-// Polymorphic component support
-interface GlassButtonProps extends PropsWithChildren {
-  as?: any;
+type GlassButtonProps = PropsWithChildren<HTMLMotionProps<"button">> & {
   variant?: Variant;
   className?: string;
-  onClick?: any;
-  [key: string]: any;
-}
+};
 
 const variantStyles: Record<Variant, string> = {
   primary:
@@ -25,18 +21,16 @@ const variantStyles: Record<Variant, string> = {
     "bg-transparent text-[var(--text-secondary)] border border-transparent hover:border-[var(--glass-border)] hover:bg-[var(--glass-bg)]",
 };
 
+import { haptics } from "@/utils/haptics";
+
 export default function GlassButton({
   children,
   className,
   variant = "primary",
   onClick,
-  as = "button",
   ...props
 }: GlassButtonProps) {
-  // Select the appropriate motion component
-  const Component = (motion as any)[as] || motion.button;
-
-  const handleClick = (e: any) => {
+  const handleClick = (e: React.MouseEvent<HTMLButtonElement>) => {
     haptics.light();
     if (onClick) {
       onClick(e);
@@ -44,7 +38,7 @@ export default function GlassButton({
   };
 
   return (
-    <Component
+    <motion.button
       whileHover={{ scale: 1.05, y: -1 }}
       whileTap={{ scale: 0.95 }}
       transition={{ type: "spring", stiffness: 500, damping: 15 }}
@@ -58,6 +52,6 @@ export default function GlassButton({
     >
       <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none" />
       {children}
-    </Component>
+    </motion.button>
   );
 }
