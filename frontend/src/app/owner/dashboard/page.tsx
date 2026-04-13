@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/axios';
-import { clearSession } from '@/lib/auth';
+import { clearSession, getStoredToken } from '@/lib/auth';
 import {
     Users, Banknote, Briefcase, TrendingUp, DollarSign, Plus, Loader2,
     AlertCircle, RefreshCw, Trophy, FileText, Trash2, Package, Clock,
@@ -183,8 +183,8 @@ export default function OwnerDashboard() {
 
     const handleExportExcel = async () => {
         try {
-            const token = localStorage.getItem('token');
-            const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const token = getStoredToken();
+            const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
             window.open(`${backendUrl}/export/orders?token=${token}`, '_blank');
             toast.success('Excel download started!', { icon: '📊' });
         } catch { toast.error('Export failed'); }

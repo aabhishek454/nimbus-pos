@@ -30,3 +30,11 @@ backend/receipts/
 # Logs
 *.log
 npm-debug.log*
+
+# Temp / local files
+*.zip
+login.js
+temp.json
+vercel_automate.js
+vercel_screenshot.png
+scripts/

@@ -5,7 +5,7 @@ import api from '@/lib/axios';
 import { CreditCard, Banknote, Plus, RefreshCw, FileText, Loader2, AlertCircle, Trash2, Clock, LogIn, LogOut, Download } from 'lucide-react';
 import { format } from 'date-fns';
 import { Toaster, toast } from 'react-hot-toast';
-import { clearSession } from '@/lib/auth';
+import { clearSession, getStoredToken } from '@/lib/auth';
 import { formatINR } from '@/utils/currency';
 
 import AnimatedPage from '@/components/AnimatedPage';
@@ -91,8 +91,8 @@ export default function EmployeeDashboard() {
     const handleGenerateInvoice = async (orderId: string) => {
         setReceiptLoading(orderId);
         try {
-            const token = localStorage.getItem('token');
-            const backendUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api';
+            const token = getStoredToken();
+            const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
             window.open(`${backendUrl}/reports/invoice/${orderId}?token=${token}`, '_blank');
             toast.success('Invoice generated!', { icon: '📄' });
         } catch (err: any) { toast.error('Failed to generate invoice'); }
