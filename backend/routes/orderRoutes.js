@@ -1,5 +1,5 @@
 const express = require('express');
-const { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics } = require('../controllers/orderController');
+const { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics, markPaid } = require('../controllers/orderController');
 const { protect } = require('../middleware/auth');
 const { attachBusiness } = require('../middleware/business');
 const { checkSubscription } = require('../middleware/subscription');
@@ -17,5 +17,6 @@ router.get('/today', getTodayOrders);
 router.get('/summary', getOrderSummary);
 router.get('/employee-activity', getEmployeeActivity);
 router.get('/analytics', getDateWiseAnalytics);
+router.patch('/:id/pay', markPaid);
 
 module.exports = router;

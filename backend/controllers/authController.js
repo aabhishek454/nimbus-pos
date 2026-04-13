@@ -41,11 +41,19 @@ const register = async (req, res, next) => {
         user.businessId = business._id;
         await user.save();
 
-        res.status(201).json({
-            success: true,
-            user: { _id: user._id, name: user.name, email: user.email, role: user.role, businessId: user.businessId },
-            token: generateToken(user._id)
-        });
+        if (user.role === 'owner') {
+            res.status(201).json({
+                success: true,
+                message: 'Account created successfully. Pending Admin approval!',
+                user: { _id: user._id, name: user.name, email: user.email, role: user.role, businessId: user.businessId }
+            });
+        } else {
+            res.status(201).json({
+                success: true,
+                user: { _id: user._id, name: user.name, email: user.email, role: user.role, businessId: user.businessId },
+                token: generateToken(user._id)
+            });
+        }
     } catch (error) {
         next(error);
     }
@@ -68,7 +76,7 @@ const login = async (req, res, next) => {
         }
 
         if (user.role === 'owner' && user.status !== 'approved') {
-            return res.status(403).json({ success: false, error: 'Account pending admin approval by administrator.' });
+            return res.status(403).json({ success: false, error: 'Account pending admin approval' });
         }
 
         res.status(200).json({

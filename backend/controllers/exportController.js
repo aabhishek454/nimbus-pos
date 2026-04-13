@@ -40,7 +40,9 @@ const exportOrdersExcel = async (req, res, next) => {
             });
         });
 
-        res.attachment('orders.xlsx');
+        const date = new Date().toISOString().split("T")[0];
+        const fileName = `orders-${date}.xlsx`;
+        res.attachment(fileName);
         res.setHeader('Content-Type', 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet');
 
         await workbook.xlsx.write(res);

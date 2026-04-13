@@ -181,12 +181,31 @@ export default function OwnerDashboard() {
         catch { toast.error('Failed'); }
     };
 
+    const downloadBlob = async (endpoint: string, fallbackName: string) => {
+        const response = await api.get(endpoint, { responseType: 'blob' });
+        const disposition = response.headers['content-disposition'];
+        let filename = fallbackName;
+        if (disposition && disposition.indexOf('attachment') !== -1) {
+            var filenameRegex = /filename[^;=\n]*=((['"]).*?\2|[^;\n]*)/;
+            var matches = filenameRegex.exec(disposition);
+            if (matches != null && matches[1]) { 
+                filename = matches[1].replace(/['"]/g, '');
+            }
+        }
+        const url = window.URL.createObjectURL(new Blob([response.data]));
+        const link = document.createElement('a');
+        link.href = url;
+        link.setAttribute('download', filename);
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+        window.URL.revokeObjectURL(url);
+    };
+
     const handleExportExcel = async () => {
         try {
-            const token = getStoredToken();
-            const backendUrl = (process.env.NEXT_PUBLIC_API_URL || 'http://localhost:5000/api').replace(/\/$/, '');
-            window.open(`${backendUrl}/export/orders?token=${token}`, '_blank');
-            toast.success('Excel download started!', { icon: '📊' });
+            await downloadBlob('/export/orders', 'orders.xlsx');
+            toast.success('Excel downloaded!', { icon: '📊' });
         } catch { toast.error('Export failed'); }
     };
 
@@ -311,10 +330,20 @@ export default function OwnerDashboard() {
                                             {orders.length === 0 ? <tr><td colSpan={5} className="p-8 text-center text-[var(--text-muted)]">No orders</td></tr> :
                                                 orders.map(o => (
                                                     <tr key={o._id} className="hover:bg-[var(--glass-bg-strong)] transition-colors duration-200 text-sm">
-                                                        <td className="p-4 font-medium">{o.customerName || 'Walk-in'}</td>
-                                                        <td className="p-4 text-[var(--text-secondary)] max-w-[200px] truncate">{(o.items || []).map((i: any) => `${i.quantity}x ${i.name}`).join(', ')}</td>
+                                                        <td className="p-4 font-medium flex flex-col gap-0.5">
+                                                            <span>{o.customerName || 'Walk-in'}</span>
+                                                            <span className="text-[10px] text-[var(--text-muted)] flex items-center gap-1 uppercase"><span className="font-mono bg-[var(--glass-bg)] px-1 rounded">{o.orderNumber || o._id.slice(-6)}</span> • {o.orderType || 'DINE-IN'}</span>
+                                                        </td>
+                                                        <td className="p-4 text-[var(--text-secondary)] max-w-[200px] truncate" title={(o.items || []).map((i: any) => `${i.quantity}x ${i.name}${i.variant && i.variant !== 'full' ? `(${i.variant})` : ''}`).join(', ')}>
+                                                            {(o.items || []).map((i: any) => `${i.quantity}x ${i.name}${i.variant && i.variant !== 'full' ? `(${i.variant})` : ''}`).join(', ')}
+                                                        </td>
                                                         <td className="p-4 text-[var(--text-secondary)]">{o.employeeId?.name || '?'}</td>
-                                                        <td className="p-4"><span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-md ${o.paymentType === 'cash' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20'}`}>{o.paymentType}</span></td>
+                                                        <td className="p-4">
+                                                            <div className="flex gap-1 flex-col xl:flex-row items-start">
+                                                                <span className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md whitespace-nowrap ${o.paymentType === 'cash' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-[var(--accent)]/10 text-[var(--accent)] border border-[var(--accent)]/20'}`}>{o.paymentType}</span>
+                                                                <span className={`px-2 py-0.5 text-[10px] uppercase font-bold rounded-md whitespace-nowrap ${o.paymentStatus === 'paid' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-orange-500/10 text-orange-500 border border-orange-500/20'}`}>{o.paymentStatus || 'unknown'}</span>
+                                                            </div>
+                                                        </td>
                                                         <td className="p-4 text-right font-bold text-[var(--text-primary)]">{formatINR(o.totalAmount)}</td>
                                                     </tr>))}
                                         </tbody>

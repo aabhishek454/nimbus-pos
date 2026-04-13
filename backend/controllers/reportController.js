@@ -106,8 +106,10 @@ const getInvoice = async (req, res, next) => {
         const invoiceNum = `INV-${String(business.invoiceCounter).padStart(5, '0')}`;
 
         const doc = new PDFDocument({ margin: 50, size: 'A4' });
+        const date = new Date().toISOString().split("T")[0];
+        const fileName = `invoice-${order.orderNumber || order._id.toString().slice(-6)}.pdf`;
         res.setHeader('Content-Type', 'application/pdf');
-        res.setHeader('Content-Disposition', `attachment; filename=${invoiceNum}.pdf`);
+        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
         doc.pipe(res);
 
         // Invoice Header
@@ -125,8 +127,10 @@ const getInvoice = async (req, res, next) => {
         // Invoice metadata
         doc.fontSize(10).fillColor('#374151');
         doc.text(`Invoice No: ${invoiceNum}`, 50);
+        doc.text(`Order Ref: ${order.orderNumber || 'N/A'}`, 50);
         doc.text(`Date: ${new Date(order.createdAt).toLocaleString('en-IN')}`, 50);
         doc.text(`Customer: ${order.customerName || 'Walk-in'}`, 50);
+        if (order.customerPhone) doc.text(`Phone: ${order.customerPhone}`, 50);
         doc.text(`Payment: ${order.paymentType.toUpperCase()}`, 50);
         doc.text(`Served by: ${order.employeeId?.name || 'Staff'}`, 50);
         doc.moveDown(1);
@@ -146,7 +150,8 @@ const getInvoice = async (req, res, next) => {
             const bg = i % 2 === 0 ? '#f9fafb' : '#ffffff';
             doc.rect(50, y - 5, 500, 22).fill(bg);
             doc.fontSize(10).fillColor('#374151');
-            doc.text(item.name, 60, y, { width: 200 });
+            const varTxt = item.variant && item.variant !== 'full' ? ` (${item.variant})` : '';
+            doc.text(`${item.name}${varTxt}`, 60, y, { width: 200 });
             doc.text(item.quantity.toString(), 270, y, { width: 60, align: 'center' });
             doc.text(`₹${item.price}`, 340, y, { width: 80, align: 'right' });
             doc.text(`₹${(item.quantity * item.price).toLocaleString('en-IN')}`, 440, y, { width: 100, align: 'right' });
@@ -169,4 +174,57 @@ const getInvoice = async (req, res, next) => {
     }
 };
 
-module.exports = { getMonthlyReport, getInvoice };
+// @desc Generate KOT (Kitchen Order Ticket) PDF
+// @route GET /api/reports/slip/:orderId
+const getKOT = async (req, res, next) => {
+    try {
+        const order = await Order.findById(req.params.orderId).populate('employeeId', 'name');
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+        const business = await Business.findById(order.businessId);
+
+        const doc = new PDFDocument({ margin: 30, size: [250, 600] }); // Receipt printer style
+        
+        const date = new Date().toISOString().split("T")[0];
+        const fileName = `kot-${order.orderNumber || order._id.toString().slice(-6)}.pdf`;
+        res.setHeader('Content-Type', 'application/pdf');
+        res.setHeader('Content-Disposition', `attachment; filename=${fileName}`);
+        
+        doc.pipe(res);
+
+        // KOT Header
+        doc.fontSize(14).fillColor('#000').text('KITCHEN ORDER TICKET', { align: 'center', bold: true });
+        doc.moveDown(0.5);
+        doc.fontSize(10);
+        doc.text(`Order No: ${order.orderNumber || order._id.toString().slice(-6)}`);
+        doc.text(`Time: ${new Date(order.createdAt).toLocaleString('en-IN')}`);
+        doc.text(`Type: ${order.orderType ? order.orderType.toUpperCase() : 'DINE-IN'}`);
+        if (order.tableNumber) doc.text(`Table: ${order.tableNumber}`);
+        doc.text(`Server: ${order.employeeId?.name || 'Staff'}`);
+        doc.moveDown(0.5);
+        
+        // Dashed line equivalent
+        doc.text('-----------------------------------', { align: 'center' });
+        doc.moveDown(0.5);
+
+        // KOT Items
+        doc.fontSize(10).text('Qty  Item Name', 30, doc.y);
+        doc.text('-----------------------------------', { align: 'center' });
+
+        (order.items || []).forEach((item) => {
+            const varTxt = item.variant && item.variant !== 'full' ? ` (${item.variant})` : '';
+            doc.text(`${item.quantity.toString().padEnd(4, ' ')} ${item.name}${varTxt}`);
+            doc.moveDown(0.2);
+        });
+
+        doc.moveDown(1);
+        doc.text('-----------------------------------', { align: 'center' });
+        doc.text('*** END OF KOT ***', { align: 'center' });
+
+        doc.end();
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { getMonthlyReport, getInvoice, getKOT };

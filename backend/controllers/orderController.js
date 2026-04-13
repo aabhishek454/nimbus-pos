@@ -4,15 +4,22 @@ const { deductInventory } = require('./inventoryController');
 // @desc Create new order
 // @route POST /api/orders
 const createOrder = async (req, res, next) => {
-    const { customerName, items, totalAmount, paymentType, status } = req.body;
+    const { customerName, customerPhone, tableNumber, orderType, items, totalAmount, paymentType, paymentStatus } = req.body;
+
+    // Generate unique short order number like 'KOT-8A4F'
+    const orderNumber = 'KOT-' + Math.random().toString(36).substring(2, 6).toUpperCase();
 
     try {
         const order = await Order.create({
-            customerName,
+            orderNumber,
+            customerName: customerName || 'Walk-in',
+            customerPhone,
+            tableNumber,
+            orderType: orderType || 'dine-in',
             items,
             totalAmount,
             paymentType,
-            status: status || 'paid',
+            paymentStatus: paymentStatus || 'pending',
             employeeId: req.user._id,
             businessId: req.businessId
         });
@@ -188,4 +195,20 @@ const getDateWiseAnalytics = async (req, res, next) => {
     }
 };
 
-module.exports = { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics };
+// @desc Mark order as paid
+// @route PATCH /api/orders/:id/pay
+const markPaid = async (req, res, next) => {
+    try {
+        const order = await Order.findOne({ _id: req.params.id, businessId: req.businessId });
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+        
+        order.paymentStatus = 'paid';
+        await order.save();
+        
+        res.status(200).json({ success: true, data: order });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics, markPaid };

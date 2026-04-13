@@ -1,13 +1,30 @@
 const mongoose = require('mongoose');
 
 const orderSchema = new mongoose.Schema({
+    orderNumber: {
+        type: String,
+        required: true,
+        unique: true
+    },
     customerName: {
         type: String,
         required: true
     },
+    customerPhone: {
+        type: String
+    },
+    tableNumber: {
+        type: String
+    },
+    orderType: {
+        type: String,
+        enum: ['dine-in', 'takeaway'],
+        default: 'dine-in'
+    },
     items: [
         {
             name: { type: String, required: true },
+            variant: { type: String, default: 'full' },
             quantity: { type: Number, required: true },
             price: { type: Number, required: true }
         }
@@ -21,10 +38,10 @@ const orderSchema = new mongoose.Schema({
         enum: ['cash', 'online'],
         required: true
     },
-    status: {
+    paymentStatus: {
         type: String,
         enum: ['paid', 'pending'],
-        default: 'paid'
+        default: 'pending'
     },
     employeeId: {
         type: mongoose.Schema.Types.ObjectId,
