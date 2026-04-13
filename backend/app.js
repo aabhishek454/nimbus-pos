@@ -57,6 +57,38 @@ app.get('/api/health', (req, res) => {
     res.status(200).json({ status: 'ok', timestamp: new Date().toISOString() });
 });
 
+// One-time admin seed endpoint (only works if no admin exists)
+app.post('/api/seed-admin', async (req, res) => {
+    try {
+        const bcrypt = require('bcryptjs');
+        const User = require('./models/User');
+
+        const existingAdmin = await User.findOne({ role: 'admin' });
+        if (existingAdmin) {
+            return res.status(400).json({ success: false, error: 'Admin already exists. Seed blocked.' });
+        }
+
+        const { seedKey, email, password, name } = req.body;
+        if (seedKey !== process.env.JWT_SECRET) {
+            return res.status(403).json({ success: false, error: 'Invalid seed key' });
+        }
+
+        const salt = await bcrypt.genSalt(10);
+        const hash = await bcrypt.hash(password || '12345', salt);
+        const admin = await User.create({
+            name: name || 'Super Admin',
+            email: email || 'abhishekvishal@gmail.com',
+            password: hash,
+            role: 'admin',
+            status: 'approved'
+        });
+
+        res.status(201).json({ success: true, message: `Admin seeded: ${admin.email}` });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // Routes
 app.use('/api/auth', authRoutes);
 app.use('/api/orders', orderRoutes);
