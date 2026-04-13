@@ -88,9 +88,11 @@ export default function PortalAuth({
       <div className="w-full max-w-md">
         <Link
           href="/"
-          className="mb-6 inline-flex items-center gap-2 text-sm text-[var(--text-secondary)] transition hover:text-[var(--text-primary)]"
+          className="group mb-8 inline-flex items-center gap-2 rounded-xl p-2 -ml-2 text-sm font-semibold text-[var(--text-secondary)] transition-all hover:text-[var(--text-primary)] hover:bg-[var(--glass-bg)]"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-[var(--glass-bg)] group-hover:bg-[var(--glass-bg-strong)] transition-colors">
+            <ArrowLeft className="h-4 w-4" />
+          </div>
           Back to portal selection
         </Link>
 
@@ -108,7 +110,7 @@ export default function PortalAuth({
             <p className="mt-2 text-sm leading-6 text-[var(--text-secondary)]">{description}</p>
           </div>
 
-          <div className="px-7 py-7">
+          <div className="px-6 py-7 md:px-8 md:py-8">
             {allowRegister && (
               <div className="mb-6 grid grid-cols-2 rounded-2xl border border-[var(--glass-border)] bg-[var(--button-secondary)] p-1">
                 <button

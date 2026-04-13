@@ -38,7 +38,7 @@ const portals = [
 export default function Home() {
   return (
     <AnimatedPage className="relative overflow-hidden">
-      <div className="absolute right-4 top-4 md:right-8 md:top-8">
+      <div className="absolute right-4 top-4 md:right-8 md:top-8 z-50">
         <ThemeToggle />
       </div>
 
@@ -93,9 +93,9 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="absolute bottom-6 w-full text-center">
-        <p className="text-sm font-medium tracking-wide text-[var(--text-muted)]">
-          Trade made by <span className="text-[var(--text-primary)] font-semibold">Abhishek</span> and <span className="text-[var(--text-primary)] font-semibold">Vishal</span> with ❤️ for Owners
+      <footer className="absolute bottom-4 left-0 w-full px-4 text-center md:bottom-8">
+        <p className="text-[10px] font-medium tracking-wider text-[var(--text-muted)] uppercase md:text-xs">
+          Crafted by <span className="text-[var(--text-primary)] font-bold">Abhishek</span> & <span className="text-[var(--text-primary)] font-bold">Vishal</span> • High-Performance SaaS
         </p>
       </footer>
     </AnimatedPage>
