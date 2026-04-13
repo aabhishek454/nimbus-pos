@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from 'react';
 import api from '@/lib/axios';
-import { CreditCard, Banknote, Plus, RefreshCw, FileText, Loader2, AlertCircle, Trash2, Clock, LogIn, LogOut, Download } from 'lucide-react';
+import { CreditCard, Banknote, Plus, RefreshCw, FileText, Loader2, AlertCircle, Trash2, Clock, LogIn, LogOut, Download, X } from 'lucide-react';
 import { format } from 'date-fns';
 import { Toaster, toast } from 'react-hot-toast';
 import { clearSession, getStoredToken } from '@/lib/auth';
@@ -35,6 +35,10 @@ export default function EmployeeDashboard() {
     const [orderType, setOrderType] = useState<'dine-in' | 'takeaway'>('dine-in');
     const [items, setItems] = useState<OrderItem[]>([{ name: '', variant: 'full', quantity: 1, price: 0 }]);
     const [paymentType, setPaymentType] = useState<'cash' | 'online'>('cash');
+
+    // Edit Modal State
+    const [editingOrder, setEditingOrder] = useState<Order | any | null>(null);
+    const [editLoading, setEditLoading] = useState(false);
 
     const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
 
@@ -95,11 +99,72 @@ export default function EmployeeDashboard() {
     const handleMarkPaid = async (orderId: string) => {
         try {
             await api.patch(`/orders/${orderId}/pay`);
-            toast.success('Order marked as paid');
+            toast.success('Payment completed', { icon: '💰' });
             silentFetchData();
         } catch (err: any) {
-            toast.error('Failed to update status');
+            toast.error(err.response?.data?.error || 'Failed to update status');
         }
+    };
+
+    const handleDeleteOrder = async (orderId: string) => {
+        if (!window.confirm('Are you sure you want to delete this order?')) return;
+        try {
+            await api.delete(`/orders/${orderId}`);
+            toast.success('Order deleted', { icon: '🗑️' });
+            silentFetchData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Failed to delete order');
+        }
+    };
+
+    const handleUpdateOrder = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!editingOrder) return;
+        const validItems = editingOrder.items.filter((i: any) => i.name.trim() && i.quantity > 0 && i.price >= 0);
+        if (validItems.length === 0) return toast.error('Please add at least one valid item');
+        
+        const newTotal = validItems.reduce((sum: number, item: any) => sum + (item.quantity * item.price), 0);
+        
+        setEditLoading(true);
+        try {
+            await api.put(`/orders/${editingOrder._id}`, {
+                customerName: editingOrder.customerName,
+                customerPhone: editingOrder.customerPhone,
+                tableNumber: editingOrder.tableNumber,
+                orderType: editingOrder.orderType,
+                items: validItems,
+                totalAmount: newTotal
+            });
+            toast.success('Order updated', { icon: '📝' });
+            setEditingOrder(null);
+            silentFetchData();
+        } catch (err: any) {
+            toast.error(err.response?.data?.error || 'Failed to update order');
+        } finally {
+            setEditLoading(false);
+        }
+    };
+
+    const updateEditItem = (index: number, field: keyof OrderItem, value: any) => {
+        setEditingOrder((prev: any) => {
+            const newItems = [...prev.items];
+            newItems[index] = { ...newItems[index], [field]: value };
+            return { ...prev, items: newItems };
+        });
+    };
+
+    const removeEditItem = (index: number) => {
+        setEditingOrder((prev: any) => {
+            const newItems = prev.items.filter((_: any, i: number) => i !== index);
+            return { ...prev, items: newItems };
+        });
+    };
+
+    const addEditItem = () => {
+        setEditingOrder((prev: any) => ({
+            ...prev,
+            items: [...prev.items, { name: '', variant: 'full', quantity: 1, price: 0 }]
+        }));
     };
 
     const downloadBlob = async (endpoint: string, fallbackName: string) => {
@@ -264,10 +329,20 @@ export default function EmployeeDashboard() {
                                                     <p className="text-[var(--text-secondary)] text-sm font-medium mt-0.5">{format(new Date(order.createdAt), 'h:mm a')} • {order.orderNumber} • <span className="uppercase tracking-wide text-xs font-bold">{order.paymentStatus}</span></p>
                                                 </div>
                                             </div>
-                                            <div className="flex gap-2 w-full sm:w-auto">
+                                            <div className="flex gap-2 w-full sm:w-auto flex-wrap justify-end mt-3 sm:mt-0">
                                                 {order.paymentStatus === 'pending' && (
                                                     <GlassButton variant="primary" onClick={() => handleMarkPaid(order._id)} className="!py-2 !px-4 text-xs font-bold !bg-emerald-500 text-white shadow-sm border-transparent">
                                                         Mark Paid
+                                                    </GlassButton>
+                                                )}
+                                                {order.paymentStatus === 'pending' && (
+                                                    <GlassButton variant="secondary" onClick={() => setEditingOrder(JSON.parse(JSON.stringify(order)))} className="!py-2 !px-3 !rounded-lg text-xs font-bold text-blue-500 hover:bg-blue-500/10 hover:border-blue-500/30">
+                                                        Edit
+                                                    </GlassButton>
+                                                )}
+                                                {order.paymentStatus === 'pending' && (
+                                                    <GlassButton variant="secondary" onClick={() => handleDeleteOrder(order._id)} className="!py-2 !px-3 !rounded-lg text-xs font-bold text-red-500 hover:bg-red-500/10 hover:border-red-500/30">
+                                                        <Trash2 className="w-3.5 h-3.5" />
                                                     </GlassButton>
                                                 )}
                                                 <GlassButton variant="secondary" onClick={() => handleGenerateKOT(order._id)} className="!py-2 !px-3 !rounded-lg text-xs font-bold">
@@ -367,6 +442,86 @@ export default function EmployeeDashboard() {
                     </GlassCard>
                 </div>
             </div>
+
+            {/* Edit Order Modal */}
+            {editingOrder && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm overflow-y-auto">
+                    <GlassCard className="w-full max-w-2xl bg-[var(--bg-primary)] border border-[var(--glass-border)] shadow-2xl relative my-8">
+                        <button onClick={() => setEditingOrder(null)} className="absolute top-4 right-4 text-[var(--text-muted)] hover:text-[var(--danger)] transition-colors"><X className="w-6 h-6" /></button>
+                        <h2 className="text-2xl font-bold mb-6 flex items-center gap-2 text-[var(--text-primary)]">
+                            <Plus className="w-6 h-6 text-blue-500 drop-shadow-sm" /> Edit Order
+                            <span className="text-sm font-mono text-[var(--text-muted)] bg-[var(--glass-bg)] px-2 py-1 rounded ml-2">{editingOrder.orderNumber}</span>
+                        </h2>
+                        
+                        <form onSubmit={handleUpdateOrder} className="space-y-6 relative z-10">
+                            <div>
+                                <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Customer Name (Optional)</label>
+                                <input type="text" value={editingOrder.customerName} onChange={(e) => setEditingOrder({...editingOrder, customerName: e.target.value})} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors focus:border-blue-500" placeholder="Walk-in" />
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Phone</label>
+                                    <input type="text" value={editingOrder.customerPhone || ''} onChange={(e) => setEditingOrder({...editingOrder, customerPhone: e.target.value})} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors focus:border-blue-500" placeholder="+91..." />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Order Type</label>
+                                    <select value={editingOrder.orderType} onChange={(e) => setEditingOrder({...editingOrder, orderType: e.target.value})} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors appearance-none cursor-pointer focus:border-blue-500">
+                                        <option value="dine-in" className="bg-[var(--bg-primary)]">Dine In</option>
+                                        <option value="takeaway" className="bg-[var(--bg-primary)]">Takeaway</option>
+                                    </select>
+                                </div>
+                            </div>
+                            
+                            {editingOrder.orderType === 'dine-in' && (
+                                <div>
+                                    <label className="text-xs font-bold text-[var(--text-secondary)] block mb-2 uppercase tracking-wider">Table Info (Optional)</label>
+                                    <input type="text" value={editingOrder.tableNumber || ''} onChange={(e) => setEditingOrder({...editingOrder, tableNumber: e.target.value})} className="w-full glass-input rounded-xl py-3 px-4 outline-none text-sm transition-colors focus:border-blue-500" placeholder="e.g. T4" />
+                                </div>
+                            )}
+
+                            <div className="space-y-4 max-h-[40vh] overflow-y-auto pr-2">
+                                <div className="flex justify-between items-center border-b border-[var(--glass-border)] pb-2 sticky top-0 bg-[var(--bg-primary)] z-10 pt-2">
+                                    <span className="text-xs font-bold text-[var(--text-secondary)] uppercase tracking-wider">Dishes</span>
+                                    <button type="button" onClick={addEditItem} className="text-blue-500 text-xs font-bold bg-blue-500/10 px-2 py-1 rounded-md hover:bg-blue-500/20 transition-colors">+ ADD ITEM</button>
+                                </div>
+                                {editingOrder.items.map((item: any, idx: number) => (
+                                    <div key={idx} className="flex gap-3 items-start glass-panel p-3 rounded-xl shadow-sm border border-[var(--glass-border)] transition-transform hover:-translate-y-0.5">
+                                        <div className="flex-1 space-y-3">
+                                            <input type="text" value={item.name} onChange={(e) => updateEditItem(idx, 'name', e.target.value)} placeholder="Dish Name" className="w-full glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5" />
+                                            <div className="flex justify-between gap-3">
+                                                <select value={item.variant} onChange={(e) => updateEditItem(idx, 'variant', e.target.value)} className="w-24 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 appearance-none">
+                                                    <option value="full" className="bg-[var(--bg-primary)]">Full</option>
+                                                    <option value="half" className="bg-[var(--bg-primary)]">Half</option>
+                                                    <option value="custom" className="bg-[var(--bg-primary)]">-</option>
+                                                </select>
+                                                <input type="number" min="1" value={item.quantity} onChange={(e) => updateEditItem(idx, 'quantity', Number(e.target.value))} className="w-20 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 font-semibold text-center" />
+                                            </div>
+                                            <div className="relative w-full">
+                                                <span className="absolute left-3 top-1/2 -translate-y-1/2 text-[var(--text-muted)] font-medium">₹</span>
+                                                <input type="number" min="0" value={item.price} onChange={(e) => updateEditItem(idx, 'price', Number(e.target.value))} className="w-full glass-input pl-8 pr-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 font-semibold" />
+                                            </div>
+                                        </div>
+                                        <button type="button" onClick={() => removeEditItem(idx)} className="text-red-500 p-2.5 hover:bg-red-500/10 rounded-lg transition-colors mt-12"><Trash2 className="w-4 h-4" /></button>
+                                    </div>
+                                ))}
+                            </div>
+                            
+                            <div className="pt-4 border-t border-[var(--glass-border)] flex flex-col sm:flex-row justify-between items-center gap-4">
+                                <div className="text-xl font-bold text-[var(--text-primary)]">
+                                    Total: <span className="text-blue-500">{formatINR(editingOrder.items.reduce((sum: number, i: any) => sum + ((i.quantity || 0) * (i.price || 0)), 0))}</span>
+                                </div>
+                                <div className="flex gap-2 w-full sm:w-auto">
+                                    <GlassButton type="button" variant="ghost" onClick={() => setEditingOrder(null)} className="flex-1 sm:flex-none !py-3">Cancel</GlassButton>
+                                    <GlassButton type="submit" variant="primary" disabled={editLoading} className="flex-1 sm:flex-none !py-3 font-bold !bg-blue-500 text-white shadow-sm border-transparent">
+                                        {editLoading ? <Loader2 className="animate-spin w-5 h-5 mx-auto" /> : 'Save Changes'}
+                                    </GlassButton>
+                                </div>
+                            </div>
+                        </form>
+                    </GlassCard>
+                </div>
+            )}
         </AnimatedPage>
     );
 }

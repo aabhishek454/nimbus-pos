@@ -202,6 +202,10 @@ const markPaid = async (req, res, next) => {
         const order = await Order.findOne({ _id: req.params.id, businessId: req.businessId });
         if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
         
+        if (order.paymentStatus === 'paid') {
+            return res.status(400).json({ success: false, error: 'Order is already marked as paid' });
+        }
+
         order.paymentStatus = 'paid';
         await order.save();
         
@@ -211,4 +215,51 @@ const markPaid = async (req, res, next) => {
     }
 };
 
-module.exports = { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics, markPaid };
+// @desc Update existing order
+// @route PUT /api/orders/:id
+const updateOrder = async (req, res, next) => {
+    const { items, totalAmount, customerName, customerPhone, tableNumber, orderType } = req.body;
+
+    try {
+        const order = await Order.findOne({ _id: req.params.id, businessId: req.businessId });
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+        if (order.paymentStatus === 'paid') {
+            return res.status(403).json({ success: false, error: 'Cannot modify paid order' });
+        }
+
+        order.items = items || order.items;
+        order.totalAmount = totalAmount || order.totalAmount;
+        if (customerName) order.customerName = customerName;
+        if (customerPhone !== undefined) order.customerPhone = customerPhone;
+        if (tableNumber !== undefined) order.tableNumber = tableNumber;
+        if (orderType) order.orderType = orderType;
+
+        await order.save();
+        
+        res.status(200).json({ success: true, data: order });
+    } catch (error) {
+        next(error);
+    }
+};
+
+// @desc Delete an order
+// @route DELETE /api/orders/:id
+const deleteOrder = async (req, res, next) => {
+    try {
+        const order = await Order.findOne({ _id: req.params.id, businessId: req.businessId });
+        if (!order) return res.status(404).json({ success: false, error: 'Order not found' });
+
+        if (order.paymentStatus === 'paid') {
+            return res.status(403).json({ success: false, error: 'Cannot delete a paid order' });
+        }
+
+        await order.deleteOne();
+        
+        res.status(200).json({ success: true, data: {} });
+    } catch (error) {
+        next(error);
+    }
+};
+
+module.exports = { createOrder, getTodayOrders, getOrderSummary, getEmployeeActivity, getAllOrders, getDateWiseAnalytics, markPaid, updateOrder, deleteOrder };
