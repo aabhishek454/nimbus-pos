@@ -4,14 +4,20 @@
   "description": "Premium SaaS dashboard for orders, analytics, and team operations.",
   "start_url": "/",
   "display": "standalone",
-  "background_color": "#0a0a0a",
-  "theme_color": "#121212",
+  "orientation": "portrait",
+  "background_color": "#0B0B0F",
+  "theme_color": "#0B0B0F",
   "icons": [
     {
-      "src": "/icon.png",
-      "sizes": "512x512",
+      "src": "/icons/icon-192x192.png",
+      "sizes": "192x192",
       "type": "image/png",
-      "purpose": "any maskable"
+      "purpose": "maskable"
+    },
+    {
+      "src": "/icons/icon-512x512.png",
+      "sizes": "512x512",
+      "type": "image/png"
     }
   ]
 }

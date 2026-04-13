@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Nimbus POS</string>
+    <string name="title_activity_main">Nimbus POS</string>
+    <string name="package_name">com.nimbus.pos</string>
+    <string name="custom_url_scheme">com.nimbus.pos</string>
+</resources>
