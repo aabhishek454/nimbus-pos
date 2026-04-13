@@ -40,19 +40,25 @@ export default function EmployeeDashboard() {
     const [editingOrder, setEditingOrder] = useState<Order | any | null>(null);
     const [editLoading, setEditLoading] = useState(false);
 
+    // Menu Catalog State
+    const [menuCatalog, setMenuCatalog] = useState<any[]>([]);
+    const [searchFocusIdx, setSearchFocusIdx] = useState<number | null>(null);
+
     const totalAmount = items.reduce((sum, item) => sum + (item.quantity * item.price), 0);
 
     const fetchData = async () => {
         setLoading(true);
         try {
-            const [summaryRes, ordersRes, attendRes] = await Promise.all([
+            const [summaryRes, ordersRes, attendRes, menuRes] = await Promise.all([
                 api.get('/orders/summary'),
                 api.get('/orders/today'),
-                api.get('/attendance/my-status')
+                api.get('/attendance/my-status'),
+                api.get('/menu')
             ]);
             setSummary(summaryRes.data.data);
             setOrders(ordersRes.data.data);
             setAttendanceStatus(attendRes.data.data);
+            setMenuCatalog(menuRes.data.data);
         } catch (err: any) {
             toast.error('Failed to load data');
         } finally { setLoading(false); }
@@ -60,12 +66,14 @@ export default function EmployeeDashboard() {
 
     const silentFetchData = async () => {
         try {
-            const [summaryRes, ordersRes] = await Promise.all([
+            const [summaryRes, ordersRes, menuRes] = await Promise.all([
                 api.get('/orders/summary'),
-                api.get('/orders/today')
+                api.get('/orders/today'),
+                api.get('/menu')
             ]);
             setSummary(summaryRes.data.data);
             setOrders(ordersRes.data.data);
+            setMenuCatalog(menuRes.data.data);
         } catch (err) { }
     };
 
@@ -151,6 +159,45 @@ export default function EmployeeDashboard() {
             newItems[index] = { ...newItems[index], [field]: value };
             return { ...prev, items: newItems };
         });
+    };
+
+    const handleItemSelect = (index: number, menuItem: any, isEditMode: boolean = false) => {
+        const defaultVariant = menuItem.variants[0] || { type: 'full', price: 0 };
+        if (isEditMode) {
+            setEditingOrder((prev: any) => {
+                const newItems = [...prev.items];
+                newItems[index] = { ...newItems[index], name: menuItem.name, variant: defaultVariant.type, price: defaultVariant.price };
+                return { ...prev, items: newItems };
+            });
+        } else {
+            const newItems = [...items];
+            newItems[index] = { ...newItems[index], name: menuItem.name, variant: defaultVariant.type, price: defaultVariant.price };
+            setItems(newItems);
+        }
+        setSearchFocusIdx(null);
+    };
+
+    const handleVariantChange = (index: number, variantType: string, isEditMode: boolean = false) => {
+        const itemState = isEditMode ? editingOrder.items[index] : items[index];
+        const menuItem = menuCatalog.find(m => m.name === itemState.name);
+        
+        let newPrice = itemState.price;
+        if (menuItem) {
+            const matchedVariant = menuItem.variants.find((v: any) => v.type === variantType);
+            if (matchedVariant) newPrice = matchedVariant.price;
+        }
+
+        if (isEditMode) {
+            setEditingOrder((prev: any) => {
+                const newItems = [...prev.items];
+                newItems[index] = { ...newItems[index], variant: variantType, price: newPrice };
+                return { ...prev, items: newItems };
+            });
+        } else {
+            const newItems = [...items];
+            newItems[index] = { ...newItems[index], variant: variantType, price: newPrice };
+            setItems(newItems);
+        }
     };
 
     const removeEditItem = (index: number) => {
@@ -400,12 +447,24 @@ export default function EmployeeDashboard() {
                                 {items.map((item, idx) => (
                                     <div key={idx} className="flex gap-3 items-start glass-panel p-3 rounded-xl shadow-sm border border-[var(--glass-border)] transition-transform hover:-translate-y-0.5">
                                         <div className="flex-1 space-y-3">
-                                            <input type="text" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} placeholder="Dish Name" className="w-full glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5" />
+                                            <div className="relative">
+                                                <input type="text" value={item.name} onChange={(e) => updateItem(idx, 'name', e.target.value)} onFocus={() => setSearchFocusIdx(idx)} onBlur={() => setTimeout(() => setSearchFocusIdx(null), 200)} placeholder="Dish Name or Search..." className="w-full glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5" />
+                                                {searchFocusIdx === idx && menuCatalog.length > 0 && (
+                                                    <div className="absolute z-50 w-full mt-1 glass-panel border border-[var(--glass-border)] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                                        {menuCatalog.filter(m => m.name.toLowerCase().includes(item.name.toLowerCase())).map((m, mIdx) => (
+                                                            <div key={mIdx} onMouseDown={() => handleItemSelect(idx, m, false)} className="px-4 py-2 text-sm hover:bg-emerald-500 hover:text-white cursor-pointer transition-colors flex justify-between">
+                                                                <span>{m.name}</span>
+                                                                <span className="opacity-70 text-xs">₹{m.variants[0]?.price}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="flex justify-between gap-3">
-                                                <select value={item.variant} onChange={(e) => updateItem(idx, 'variant', e.target.value)} className="w-24 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 appearance-none">
-                                                    <option value="full" className="bg-[var(--bg-primary)]">Full</option>
-                                                    <option value="half" className="bg-[var(--bg-primary)]">Half</option>
-                                                    <option value="custom" className="bg-[var(--bg-primary)]">-</option>
+                                                <select value={item.variant} onChange={(e) => handleVariantChange(idx, e.target.value, false)} className="w-24 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 appearance-none">
+                                                    {(menuCatalog.find(m => m.name === item.name)?.variants || [{ type: 'full' }, { type: 'half' }, { type: 'custom' }]).map((v: any, vi: number) => (
+                                                        <option key={vi} value={v.type} className="bg-[var(--bg-primary)] capitalize">{v.type}</option>
+                                                    ))}
                                                 </select>
                                                 <input type="number" min="1" value={item.quantity} onChange={(e) => updateItem(idx, 'quantity', Number(e.target.value))} className="w-20 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 font-semibold text-center" />
                                             </div>
@@ -488,12 +547,24 @@ export default function EmployeeDashboard() {
                                 {editingOrder.items.map((item: any, idx: number) => (
                                     <div key={idx} className="flex gap-3 items-start glass-panel p-3 rounded-xl shadow-sm border border-[var(--glass-border)] transition-transform hover:-translate-y-0.5">
                                         <div className="flex-1 space-y-3">
-                                            <input type="text" value={item.name} onChange={(e) => updateEditItem(idx, 'name', e.target.value)} placeholder="Dish Name" className="w-full glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5" />
+                                            <div className="relative">
+                                                <input type="text" value={item.name} onChange={(e) => updateEditItem(idx, 'name', e.target.value)} onFocus={() => setSearchFocusIdx(idx)} onBlur={() => setTimeout(() => setSearchFocusIdx(null), 200)} placeholder="Dish Name or Search..." className="w-full glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5" />
+                                                {searchFocusIdx === idx && menuCatalog.length > 0 && (
+                                                    <div className="absolute z-50 w-full mt-1 glass-panel border border-[var(--glass-border)] rounded-lg shadow-xl max-h-48 overflow-y-auto">
+                                                        {menuCatalog.filter(m => m.name.toLowerCase().includes((item.name || '').toLowerCase())).map((m, mIdx) => (
+                                                            <div key={mIdx} onMouseDown={() => handleItemSelect(idx, m, true)} className="px-4 py-2 text-sm hover:bg-blue-500 hover:text-white cursor-pointer transition-colors flex justify-between">
+                                                                <span>{m.name}</span>
+                                                                <span className="opacity-70 text-xs">₹{m.variants[0]?.price}</span>
+                                                            </div>
+                                                        ))}
+                                                    </div>
+                                                )}
+                                            </div>
                                             <div className="flex justify-between gap-3">
-                                                <select value={item.variant} onChange={(e) => updateEditItem(idx, 'variant', e.target.value)} className="w-24 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 appearance-none">
-                                                    <option value="full" className="bg-[var(--bg-primary)]">Full</option>
-                                                    <option value="half" className="bg-[var(--bg-primary)]">Half</option>
-                                                    <option value="custom" className="bg-[var(--bg-primary)]">-</option>
+                                                <select value={item.variant} onChange={(e) => handleVariantChange(idx, e.target.value, true)} className="w-24 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 appearance-none">
+                                                    {(menuCatalog.find(m => m.name === item.name)?.variants || [{ type: 'full' }, { type: 'half' }, { type: 'custom' }]).map((v: any, vi: number) => (
+                                                        <option key={vi} value={v.type} className="bg-[var(--bg-primary)] capitalize">{v.type}</option>
+                                                    ))}
                                                 </select>
                                                 <input type="number" min="1" value={item.quantity} onChange={(e) => updateEditItem(idx, 'quantity', Number(e.target.value))} className="w-20 glass-input px-3 py-2.5 rounded-lg text-sm text-[var(--text-primary)] border-none bg-black/5 dark:bg-white/5 font-semibold text-center" />
                                             </div>

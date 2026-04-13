@@ -246,15 +246,11 @@ export default function OwnerDashboard() {
                             <Bell className="w-4 h-4" /> {lowStockAlerts.length} Low Stock
                         </div>
                     )}
-                    <ThemeToggle />
                     <GlassButton variant="secondary" onClick={handleExportExcel} className="!py-2 border border-[var(--glass-border)] text-emerald-500 font-bold">
                         <Download className="w-4 h-4" /> Export Excel
                     </GlassButton>
                     <GlassButton variant="ghost" onClick={fetchAll} disabled={loading} className="!py-2 font-bold text-[var(--text-primary)]">
                         <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} /> Sync
-                    </GlassButton>
-                    <GlassButton variant="ghost" onClick={() => { clearSession(); window.location.href = '/'; }} className="!py-2 text-red-500 font-bold">
-                        Logout
                     </GlassButton>
                 </div>
             </header>

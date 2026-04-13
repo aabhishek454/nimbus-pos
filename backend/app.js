@@ -13,6 +13,7 @@ const inventoryRoutes = require('./routes/inventoryRoutes');
 const attendanceRoutes = require('./routes/attendanceRoutes');
 const exportRoutes = require('./routes/exportRoutes');
 const reportRoutes = require('./routes/reportRoutes');
+const menuRoutes = require('./routes/menuRoutes');
 
 const app = express();
 
@@ -100,6 +101,7 @@ app.use('/api/inventory', inventoryRoutes);
 app.use('/api/attendance', attendanceRoutes);
 app.use('/api/export', exportRoutes);
 app.use('/api/reports', reportRoutes);
+app.use('/api/menu', menuRoutes);
 
 // Centralized error handler
 app.use((err, req, res, next) => {
